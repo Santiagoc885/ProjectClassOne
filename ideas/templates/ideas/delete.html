@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Eliminar Idea</h2>
+<p>¿Estás seguro de que deseas eliminar la idea "{{ idea.title }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Eliminar</button>
+</form>
+<a href="{% url 'idea_list' %}">Cancelar</a>
+{% endcomment %}
