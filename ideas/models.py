@@ -1,38 +1,54 @@
-from django.db import models
-from django.contrib.auth.models import User
+import requests
+from django.conf import settings
 
-class Ideas(models.Model):
-    INNOVATION_TYPES = [
-        ('Incremental', 'Incremental'),
-        ('Radical', 'Radical'),
-        ('Transformacional', 'Transformacional'),
-        ('Otro', 'Otro'),
-    ]
+class APIClient:
+    BASE_URL = settings.API_URL
 
-    INNOVATION_FOCUS = [
-        ('Modelo de Negocios', 'Modelo de Negocios'),
-        ('Productos', 'Productos'),
-        ('Servicios', 'Servicios')
+    def __init__(self, table_name):
+        self.table_name = table_name
 
-    ]
+    def _make_request(self, procedure, where_condition=None, order_by=None, limit_clause=None, json_data=None, select_columns=None):
+        url = self.BASE_URL
+        payload = {
+            "procedure": procedure,
+            "parameters": {
+                "table_name": self.table_name,
+                "where_condition": where_condition,
+                "order_by": order_by,
+                "limit_clause": limit_clause,
+                "json_data": json_data if json_data else {},
+                "select_columns": select_columns
+            }
+        }
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Lanza una excepción si la solicitud falla
+        return response.json()
 
-    title = models.CharField(max_length=200)
-    description = models.TextField()
-    key_words = models.CharField(max_length=255, blank=True)
-    resources = models.CharField(max_length=255, blank=True)
-    innovation_type =  models.CharField(max_length=50, choices=INNOVATION_TYPES, default='Tipo de Innovación')
-    innovation_focus= models.CharField(max_length=50, choices=INNOVATION_FOCUS, default='Foco de Innovación')
-    created_at = models.DateField(blank=False, null=False) 
-    # created_by = models.ForeignKey(User, on_delete=models.CASCADE, blank=False, null=False)
-    file = models.FileField(upload_to='videos/', null=True, blank=True)
+    def get_data(self, where_condition=None, order_by=None, limit_clause=None, json_data=None, select_columns=None):
+        return self._make_request(
+            procedure="select_json_entity",
+            where_condition=where_condition,
+            order_by=order_by,
+            limit_clause=limit_clause,
+            json_data=json_data,
+            select_columns=select_columns
+        ).get('outputParams', {}).get('result', [])
+    
+    def delete_data(self, where_condition=None):
+        return self._make_request(
+            procedure="delete_json_entity",
+            where_condition=where_condition
+        )
 
-        
+    def insert_data(self, json_data=None):
+        return self._make_request(
+            procedure="insert_json_entity",
+            json_data=json_data
+        )
 
-    class Meta:
-        db_table = 'tbl_ideas'
-        verbose_name = 'Ideas'
-        ordering=['title']
-
-
-    def __str__(self):
-        return self.title
+    def update_data(self, where_condition=None, json_data=None):
+        return self._make_request(
+            procedure="update_json_entity",
+            where_condition=where_condition,
+            json_data=json_data
+        )

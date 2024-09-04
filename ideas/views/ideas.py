@@ -1,61 +1,68 @@
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
+
+from django.shortcuts import render
+from ideas.models import APIClient
 from django.shortcuts import render, redirect
-from ideas.models import Ideas
 from ideas.forms.ideas_form import IdeasForm
-from django.urls import reverse_lazy
-# from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+import requests
 from django.contrib import messages
 
+def list_ideas(request):
+    client = APIClient('ideas')
+    ideas = client.get_data()
+    return render(request, 'ideas/list.html', {'ideas': ideas})
 
 
-def base(request):
-    return render(request, 'base.html')
+def create_idea(request):
+    if request.method == 'POST':
+        form = IdeasForm(request.POST, request.FILES)
+        if form.is_valid():
+            client = APIClient('ideas')
+            try:
+                response = client.insert_data(json_data=form.cleaned_data)
+                messages.success(request, 'Idea creada con éxito.')
+                return redirect('list')
+            except requests.exceptions.HTTPError as e:
+                messages.error(request, f'Error al crear la idea: {e}')
+                print(f'Error al crear la idea: {e}')  # Depuración
+            except Exception as e:
+                messages.error(request, f'Error inesperado: {e}')
+                print(f'Error inesperado: {e}')  # Depuración
+    else:
+        form = IdeasForm()
+    return render(request, 'ideas/create.html', {'form': form})
 
-class IdeaListView(ListView):
-    model = Ideas
-    template_name: str = 'ideas/list.html'
-    context_object_name = 'ideas'
-    permission_required = 'ideas.view_ideas'
 
-    queryset =[]
 
-class IdeaCreateView(CreateView):
-    model = Ideas
-    form_class = IdeasForm
-    template_name = 'ideas/create.html'
-    success_url = reverse_lazy('ideas:ideas_list')
-    permission_required = 'ideas.add_ideas'
+def update_idea(request, pk):
+    client = APIClient('ideas')
+    idea = client.get_data(where_condition=f"id = {pk}")
+    if not idea:
+        return redirect('list')
 
-    def form_valid ( self , form ) :
-        messages.success ( self.request , ' Registro creado con éxito ' )
-        return super ( ) . form_valid ( form )
-    
+    if request.method == 'POST':
+        form = IdeasForm(request.POST, request.FILES)
+        if form.is_valid():
+            client.update_data(where_condition=f"id = {pk}", json_data=form.cleaned_data)
+            messages.success(request, 'Idea actualizada con éxito.')
+            return redirect('list')
+    else:
+        form = IdeasForm(initial=idea[0])
 
-class IdeaUpdateView(UpdateView):
-    model = Ideas
-    form_class = IdeasForm
-    template_name = 'ideas/update.html'
-    success_url = reverse_lazy('ideas:ideas_list')
-    permission_required = 'ideas.update_ideas'
-    
-    def form_valid ( self , form ) :
-        messages.success ( self.request , ' Registro actualizado con éxito ' )
-        return super ( ) . form_valid ( form )
+    return render(request, 'ideas/update.html', {'form': form})
 
-class IdeaDeleteView( DeleteView):
-    model = Ideas
-    template_name = 'ideas/delete.html'
-    success_url = reverse_lazy('ideas:ideas_list')
-    context_object_name = 'ideas'
-    permission_required = 'ideas.delete_ideas'
-    
 
-    def delete(self, *args, **kwargs):
-        messages.success(self.request, 'Registro eliminado con éxito')
-        return super().delete(*args, **kwargs)
 
-class IdeaDetailView( DetailView):
-    model = Ideas
-    template_name = 'ideas/detail.html'
-    context_object_name = 'ideas'
-    permission_required = 'ideas.view_ideas'
+def delete_idea(request, pk):
+    client = APIClient('ideas')
+    idea = client.get_data(where_condition=f"id = {pk}")
+    if not idea:
+        return redirect('list')
+
+    if request.method == 'POST':
+        client.delete_data(where_condition=f"id = {pk}")
+        messages.success(request, 'Idea eliminada con éxito.')
+        return redirect('list')
+
+    return render(request, 'ideas/delete.html', {'idea': idea[0]})
